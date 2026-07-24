@@ -22,6 +22,9 @@ permissions:
 
 jobs:
   score:
+    # job-level gate: unauthorized actors never start this job at all (no concurrency-group hold,
+    # no Actions run) — availability protected, not just secrets. In-job guard remains as belt.
+    if: contains(format(',{0},', vars.ALLOWED_SUBMITTERS || 'mm5srh4ngk-droid'), format(',{0},', github.actor))
     runs-on: ubuntu-latest
     environment: trust-truth   # secrets live ONLY in this environment on the vault account
     steps:

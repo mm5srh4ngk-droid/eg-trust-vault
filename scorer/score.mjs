@@ -31,19 +31,21 @@ function fail(msg) { // unmintable — chain untrustworthy
 
 // --- chain head (verify before any mint) + replay index ---
 const files = readdirSync(CHAIN).filter(f => CP_RE.test(f)).sort();
-let prevHash, prevSeq; const seenRuns = new Set(), seenPayloads = new Set();
+let prevHash, prevSeq; const seenRuns = new Set(), seenPayloads = new Set(), consumed = new Set();
 if (files.length === 0) {
   if (!existsSync(join(CHAIN, 'GENESIS.json'))) fail('no genesis');
   const g = JSON.parse(readFileSync(join(CHAIN, 'GENESIS.json'), 'utf8'));
   prevHash = sha256(JSON.stringify({ ...g, self_hash: undefined })); prevSeq = 0;
   if (g.self_hash !== prevHash) fail('genesis integrity');
 } else {
-  for (const f of files) { const c = JSON.parse(readFileSync(join(CHAIN, f), 'utf8')); if (c.run_id) seenRuns.add(c.run_id); if (c.payload_sha256) seenPayloads.add(c.payload_sha256); }
+  for (const f of files) { const c = JSON.parse(readFileSync(join(CHAIN, f), 'utf8')); if (c.run_id) seenRuns.add(c.run_id); if (c.payload_sha256) seenPayloads.add(c.payload_sha256);
+    for (const r of c.results || []) if (typeof r.commit === 'string' && /^[0-9a-f]{64}$/.test(r.commit)) consumed.add(r.commit); }
   const last = JSON.parse(readFileSync(join(CHAIN, files[files.length - 1]), 'utf8'));
   const { self_hash, vault_mac, ...body } = last;
   if (sha256(JSON.stringify(body)) !== self_hash) fail('chain head integrity');
   prevHash = self_hash; prevSeq = last.seq;
 }
+if (prevSeq >= 999999) fail('chain sequence capacity reached — widen filenames before minting');
 
 // --- secrets → commitment index ---
 const salt = process.env.TRUTH_SALT || '';
@@ -89,6 +91,10 @@ if (!reject) {
     if (!/^[0-9a-f]{64}$/.test(commit) || !['SHIP','FIX-FIRST','BLOCK'].includes(council)) { counts.invalid++; results.push({ commit: commit || '?', council, r: 'INVALID-MALFORMED' }); continue; }
     if (seenCommits.has(commit)) { counts.invalid++; results.push({ commit, council, r: 'INVALID-DUPLICATE' }); continue; }
     seenCommits.add(commit);
+    // CROSS-ROUND CONSUMPTION (rotation doctrine, vault-enforced): a commitment scored in ANY prior
+    // round is spent — its class is publicly inferable from that round's result, so it can never
+    // count again. Endless-PASS-from-one-known-case is structurally impossible.
+    if (consumed.has(commit)) { counts.invalid++; results.push({ commit, council, r: 'INVALID-CONSUMED' }); continue; }
     const t = index.get(commit);
     if (!t) { counts.invalid++; results.push({ commit, council, r: 'INVALID-UNKNOWN-COMMIT' }); continue; }
     let r;
