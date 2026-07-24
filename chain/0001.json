@@ -1,0 +1,26 @@
+{
+  "seq": 1,
+  "prev": "b67bc397f46ba07b61a63bb2a63f0b3739839dc73c35a4bcc7e12047ba065887",
+  "ts": "2026-07-24T11:12:34.430Z",
+  "run_id": "live-e2e-test",
+  "reject": null,
+  "counts": {
+    "caught": 1,
+    "match": 1,
+    "miss": 0,
+    "overblock": 0,
+    "invalid": 0
+  },
+  "results": [
+    {
+      "commit": "12998cd64ce8",
+      "r": "CAUGHT"
+    },
+    {
+      "commit": "21af51a07a40",
+      "r": "MATCH"
+    }
+  ],
+  "verdict": "PASS",
+  "self_hash": "6e96e103869a885b3c7a8581237bfde85df5bbce7820e1c243a8aa2180131c4f"
+}
