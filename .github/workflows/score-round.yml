@@ -25,6 +25,13 @@ jobs:
     runs-on: ubuntu-latest
     environment: trust-truth   # secrets live ONLY in this environment on the vault account
     steps:
+      - name: authorize submitter (allowlist BEFORE anything else — outsiders never reach scoring)
+        env:
+          ACTOR: ${{ github.actor }}
+          ALLOWED: ${{ vars.ALLOWED_SUBMITTERS || 'mm5srh4ngk-droid' }}
+        run: |
+          case ",$ALLOWED," in *",$ACTOR,"*) echo "authorized: $ACTOR";; *) echo "UNAUTHORIZED submitter: $ACTOR"; exit 1;; esac
+
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
 
@@ -40,6 +47,11 @@ jobs:
           TRUTH_VERDICTS_B64: ${{ secrets.TRUTH_VERDICTS_B64 }}
           ISSUE_BODY_FILE: /tmp/issue-body.txt
           CHAIN_DIR: ./chain
+          SUBMITTER: ${{ github.actor }}
+          ISSUE_NUMBER: ${{ github.event.issue.number || '' }}
+          WF_RUN_ID: ${{ github.run_id }}
+          REPO_SHA: ${{ github.sha }}
+          MIN_BAD: ${{ vars.MIN_BAD || '1' }}
         run: node scorer/score.mjs
 
       - name: verify the full chain before publishing (never push a broken chain)
@@ -50,7 +62,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add chain/
-          git commit -m "checkpoint: $(ls chain | grep -E '^[0-9]{4}\.json$' | sort | tail -1)"
+          git commit -m "checkpoint: $(ls chain | grep -E '^[0-9]{6}\.json$' | sort | tail -1)"
           git push
 
       - name: comment verdict + close issue
