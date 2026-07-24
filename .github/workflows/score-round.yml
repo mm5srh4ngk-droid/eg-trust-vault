@@ -1,0 +1,72 @@
+name: score-round
+# Scores a held-out eval round against the vault-held answer key and mints a hash-chained
+# checkpoint. Trigger = issue opened (submitters need ZERO write access) or manual dispatch.
+# The issue body is UNTRUSTED DATA — it reaches the scorer only via a file, never a shell string.
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      body:
+        description: 'round submission (same fenced-json format as an issue body)'
+        required: true
+        type: string
+
+concurrency:
+  group: chain-append          # serialize — two rounds must never race the chain
+  cancel-in-progress: false
+
+permissions:
+  contents: write              # append checkpoint commits
+  issues: write                # comment the verdict + close
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    environment: trust-truth   # secrets live ONLY in this environment on the vault account
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: stage untrusted body as a file (never shell-interpolated)
+        env:
+          BODY: ${{ github.event_name == 'issues' && github.event.issue.body || inputs.body }}
+        run: printf '%s' "$BODY" > /tmp/issue-body.txt
+
+      - name: score + mint checkpoint (fail-closed)
+        id: score
+        env:
+          TRUTH_SALT: ${{ secrets.TRUTH_SALT }}
+          TRUTH_VERDICTS_B64: ${{ secrets.TRUTH_VERDICTS_B64 }}
+          ISSUE_BODY_FILE: /tmp/issue-body.txt
+          CHAIN_DIR: ./chain
+        run: node scorer/score.mjs
+
+      - name: verify the full chain before publishing (never push a broken chain)
+        run: node verifier/verify-chain.mjs ./chain
+
+      - name: commit checkpoint (github-actions bot — an identity no council machine can fake)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add chain/
+          git commit -m "checkpoint: $(ls chain | grep -E '^[0-9]{4}\.json$' | sort | tail -1)"
+          git push
+
+      - name: comment verdict + close issue
+        if: github.event_name == 'issues'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          gh issue comment "$ISSUE" --body-file RESULT.md
+          gh issue close "$ISSUE"
+
+      - name: on refusal, still report (fail-closed is loud, never silent)
+        if: failure() && github.event_name == 'issues'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          gh issue comment "$ISSUE" --body-file RESULT.md 2>/dev/null || gh issue comment "$ISSUE" --body "## ❌ REFUSED — scoring failed closed. No checkpoint minted; the eval stays advisory."
+          gh issue close "$ISSUE"
