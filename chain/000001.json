@@ -1,0 +1,36 @@
+{
+  "seq": 1,
+  "prev": "92a918a10d1b0e00dfa1b031ef1bac45eabef314299a1054183c0096df939d72",
+  "ts": "2026-07-24T11:20:16.723Z",
+  "run_id": "v2-live-2",
+  "reject": null,
+  "submitter": "mm5srh4ngk-droid",
+  "issue": "4",
+  "workflow_run": "30089204690",
+  "repo_sha": "cc6116221fc864aa7cabf9950ba24feba1ae637a",
+  "payload_sha256": "0f58e3a346e59e90e79d9b1e5fe7bcdf647499c5ea3c40cea4c8884510c3e004",
+  "min_bad_policy": 1,
+  "counts": {
+    "caught": 1,
+    "match": 1,
+    "miss": 0,
+    "overblock": 0,
+    "invalid": 0,
+    "bad_seen": 1
+  },
+  "results": [
+    {
+      "commit": "12998cd64ce824f5188fea068d08dd3b96528daa489e51d4ea179519344ab614",
+      "council": "BLOCK",
+      "r": "CAUGHT"
+    },
+    {
+      "commit": "21af51a07a40b96a407ec5bcc9d8b5d5ac5973768a2c42d87fbb1d645ab5439b",
+      "council": "SHIP",
+      "r": "MATCH"
+    }
+  ],
+  "verdict": "PASS",
+  "self_hash": "c06093fd631e97a7ffb9f7a263e053d407e605d5d935d1246fb04f08da29ee90",
+  "vault_mac": "2ad455c280d3423420ad2d56a7945a53ac27a0947b4908df90f923a5f4e7e124"
+}
