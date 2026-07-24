@@ -1,0 +1,30 @@
+{
+  "seq": 5,
+  "prev": "0e204e6bd449b8d5cbfc73d87b98b282cb2c48dfa2ca495cbb0edc1b9ef30423",
+  "ts": "2026-07-24T11:58:16.286Z",
+  "kind": "registration",
+  "commits": [
+    "05548a6edcc5d1eacfb4f0c1f364c602cf1f77012a48a39f8eb2659d0a049ad6",
+    "0681fe6549f67457e8bd33088cff992fbee26b8b0084770f244a6c9921603f81"
+  ],
+  "run_id": "2026-07-24-heldout-s2c",
+  "reject": null,
+  "submitter": "mm5srh4ngk-droid",
+  "issue": "12",
+  "workflow_run": "30091388359",
+  "repo_sha": "eaad1ae92342c26f57baaaaa9216af4401d855bc",
+  "payload_sha256": "f584192cd33bd07c2a90d8dc4cbac7805439bea468688458313081baef0cf7fb",
+  "min_bad_policy": 1,
+  "counts": {
+    "caught": 0,
+    "match": 0,
+    "miss": 0,
+    "overblock": 0,
+    "invalid": 0,
+    "bad_seen": 0
+  },
+  "results": [],
+  "verdict": "REGISTERED",
+  "self_hash": "029e2ead4dfabcf887effd3dd4edabce4e6f2679b60b99b99cd13477c9e7672d",
+  "vault_mac": "567eed8b9db0531fa3e120fd14056af5ee5a5faa7d83cb39b3ac9674ddbf8c6a"
+}
