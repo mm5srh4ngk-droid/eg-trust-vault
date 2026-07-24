@@ -29,28 +29,37 @@ function fail(msg) { // unmintable — chain untrustworthy
   console.log(`REFUSED: ${msg}`); process.exit(1);
 }
 
-// --- chain head (verify before any mint) + replay index ---
+// --- FULLY-VERIFYING chain walk (gate round 3): genesis + EVERY checkpoint's schema, seq,
+// prev-linkage, self-hash, and vault MAC verified IN ORDER before ANY checkpoint data
+// (registrations, consumption, replay state) is trusted. Tampered/injected mid-chain → named refusal.
+if (!existsSync(join(CHAIN, 'GENESIS.json'))) fail('no genesis');
+let g; try { g = JSON.parse(readFileSync(join(CHAIN, 'GENESIS.json'), 'utf8')); } catch { fail('corrupt genesis'); }
+let prevHash = sha256(JSON.stringify({ ...g, self_hash: undefined })), prevSeq = 0;
+if (g.self_hash !== prevHash) fail('genesis integrity');
+
 const files = readdirSync(CHAIN).filter(f => CP_RE.test(f)).sort();
-let prevHash, prevSeq; const seenRuns = new Set(), seenPayloads = new Set(), consumed = new Set();
+const seenRuns = new Set(), seenPayloads = new Set(), consumed = new Set();
 const registrations = new Map();  // run_id -> {commits:Set, ts, scored:bool}
-if (files.length === 0) {
-  if (!existsSync(join(CHAIN, 'GENESIS.json'))) fail('no genesis');
-  const g = JSON.parse(readFileSync(join(CHAIN, 'GENESIS.json'), 'utf8'));
-  prevHash = sha256(JSON.stringify({ ...g, self_hash: undefined })); prevSeq = 0;
-  if (g.self_hash !== prevHash) fail('genesis integrity');
-} else {
-  for (const f of files) {
-    let c; try { c = JSON.parse(readFileSync(join(CHAIN, f), 'utf8')); } catch { fail(`corrupt chain file ${f}`); }
-    if (c.payload_sha256) seenPayloads.add(c.payload_sha256);
-    if (c.kind === 'registration') { registrations.set(c.run_id, { commits: new Set(c.commits || []), ts: c.ts, scored: false }); continue; }
-    if (c.run_id) { seenRuns.add(c.run_id); const reg = registrations.get(c.run_id); if (reg) reg.scored = true; }
-    // consumption: ONLY class-revealing results (an unknown-commit typo must not kill a future case)
-    for (const r of c.results || []) if (typeof r.commit === 'string' && /^[0-9a-f]{64}$/.test(r.commit)
-      && ['CAUGHT','MATCH','DRIFT-MISS','DRIFT-OVERBLOCK'].includes(r.r)) consumed.add(r.commit); }
-  const last = JSON.parse(readFileSync(join(CHAIN, files[files.length - 1]), 'utf8'));
-  const { self_hash, vault_mac, ...body } = last;
-  if (sha256(JSON.stringify(body)) !== self_hash) fail('chain head integrity');
-  prevHash = self_hash; prevSeq = last.seq;
+for (const f of files) {
+  let c; try { c = JSON.parse(readFileSync(join(CHAIN, f), 'utf8')); } catch { fail(`corrupt chain file ${f}`); }
+  const { self_hash, vault_mac, ...body } = c;
+  if (typeof c.seq !== 'number' || c.seq !== prevSeq + 1) fail(`chain sequence break at ${f}`);
+  if (f !== String(c.seq).padStart(6, '0') + '.json') fail(`filename/seq mismatch at ${f}`);
+  if (c.prev !== prevHash) fail(`chain linkage break at ${f}`);
+  if (sha256(JSON.stringify(body)) !== self_hash) fail(`chain integrity break at ${f}`);
+  if (vault_mac !== createHmac('sha256', process.env.TRUTH_SALT || '').update(self_hash).digest('hex')) fail(`vault MAC invalid at ${f}`);
+  prevHash = self_hash; prevSeq = c.seq;
+  // only now is this checkpoint's data trusted:
+  if (c.payload_sha256) seenPayloads.add(c.payload_sha256);
+  if (c.kind === 'registration') {
+    if (!Array.isArray(c.commits) || typeof c.run_id !== 'string') fail(`malformed registration checkpoint at ${f}`);
+    if (registrations.has(c.run_id)) fail(`duplicate historical registration at ${f}`);
+    registrations.set(c.run_id, { commits: new Set(c.commits), ts: c.ts, scored: false });
+    continue;
+  }
+  if (c.run_id) { seenRuns.add(c.run_id); const reg = registrations.get(c.run_id); if (reg) reg.scored = true; }
+  for (const r of c.results || []) if (typeof r?.commit === 'string' && /^[0-9a-f]{64}$/.test(r.commit)
+    && ['CAUGHT','MATCH','DRIFT-MISS','DRIFT-OVERBLOCK'].includes(r.r)) consumed.add(r.commit);
 }
 if (prevSeq >= 999999) fail('chain sequence capacity reached — widen filenames before minting');
 
