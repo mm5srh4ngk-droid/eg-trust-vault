@@ -1,0 +1,22 @@
+{
+  "seq": 2,
+  "prev": "6e96e103869a885b3c7a8581237bfde85df5bbce7820e1c243a8aa2180131c4f",
+  "ts": "2026-07-24T11:13:28.029Z",
+  "run_id": "live-drift-test",
+  "reject": null,
+  "counts": {
+    "caught": 0,
+    "match": 0,
+    "miss": 1,
+    "overblock": 0,
+    "invalid": 0
+  },
+  "results": [
+    {
+      "commit": "12998cd64ce8",
+      "r": "DRIFT-MISS"
+    }
+  ],
+  "verdict": "DRIFT",
+  "self_hash": "2d03243547fd539a3465b560b3ca9831259bc7e40311fe59be27c6bef0bfbd0f"
+}
