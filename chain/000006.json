@@ -1,0 +1,37 @@
+{
+  "seq": 6,
+  "prev": "029e2ead4dfabcf887effd3dd4edabce4e6f2679b60b99b99cd13477c9e7672d",
+  "ts": "2026-07-24T11:58:35.338Z",
+  "kind": "round",
+  "run_id": "2026-07-24-heldout-s2c",
+  "reject": null,
+  "submitter": "mm5srh4ngk-droid",
+  "issue": "13",
+  "workflow_run": "30091406957",
+  "repo_sha": "2ab938594e4a606e657292ec8cac96ec9c113509",
+  "payload_sha256": "861648f70f90c4e98b2693ab50779b9f135a7e999538b527cccc5f888febee49",
+  "min_bad_policy": 1,
+  "counts": {
+    "caught": 1,
+    "match": 0,
+    "miss": 0,
+    "overblock": 1,
+    "invalid": 0,
+    "bad_seen": 1
+  },
+  "results": [
+    {
+      "commit": "05548a6edcc5d1eacfb4f0c1f364c602cf1f77012a48a39f8eb2659d0a049ad6",
+      "council": "FIX-FIRST",
+      "r": "CAUGHT"
+    },
+    {
+      "commit": "0681fe6549f67457e8bd33088cff992fbee26b8b0084770f244a6c9921603f81",
+      "council": "FIX-FIRST",
+      "r": "DRIFT-OVERBLOCK"
+    }
+  ],
+  "verdict": "OVERBLOCK",
+  "self_hash": "caad248acb6daef9a98e0a2b6f588279a1432d1627959755a759ea41965fb184",
+  "vault_mac": "2055f8a63e5f5b5522ba1a4c4b182c214631fa205ce47954539b8cc414c4052e"
+}
