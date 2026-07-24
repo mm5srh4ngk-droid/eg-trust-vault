@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd ~/.echo-main/protocols/council/runs/2026-07-24-trust-vault\\nfor i in $(seq 1 8); do pgrep -f \\\"fable-ask.sh --file.*trust-vault/chairman\\\" >/dev/null || break; sleep 15; done\\n[ -s verd...",
+  "error": "Exit code 143\nCommand timed out after 2m 0s",
+  "timestamp": "2026-07-24T11:26:22.697Z",
+  "retry_count": 1
+}

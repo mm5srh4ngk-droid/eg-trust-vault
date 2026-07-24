@@ -32,14 +32,21 @@ function fail(msg) { // unmintable — chain untrustworthy
 // --- chain head (verify before any mint) + replay index ---
 const files = readdirSync(CHAIN).filter(f => CP_RE.test(f)).sort();
 let prevHash, prevSeq; const seenRuns = new Set(), seenPayloads = new Set(), consumed = new Set();
+const registrations = new Map();  // run_id -> {commits:Set, ts, scored:bool}
 if (files.length === 0) {
   if (!existsSync(join(CHAIN, 'GENESIS.json'))) fail('no genesis');
   const g = JSON.parse(readFileSync(join(CHAIN, 'GENESIS.json'), 'utf8'));
   prevHash = sha256(JSON.stringify({ ...g, self_hash: undefined })); prevSeq = 0;
   if (g.self_hash !== prevHash) fail('genesis integrity');
 } else {
-  for (const f of files) { const c = JSON.parse(readFileSync(join(CHAIN, f), 'utf8')); if (c.run_id) seenRuns.add(c.run_id); if (c.payload_sha256) seenPayloads.add(c.payload_sha256);
-    for (const r of c.results || []) if (typeof r.commit === 'string' && /^[0-9a-f]{64}$/.test(r.commit)) consumed.add(r.commit); }
+  for (const f of files) {
+    let c; try { c = JSON.parse(readFileSync(join(CHAIN, f), 'utf8')); } catch { fail(`corrupt chain file ${f}`); }
+    if (c.payload_sha256) seenPayloads.add(c.payload_sha256);
+    if (c.kind === 'registration') { registrations.set(c.run_id, { commits: new Set(c.commits || []), ts: c.ts, scored: false }); continue; }
+    if (c.run_id) { seenRuns.add(c.run_id); const reg = registrations.get(c.run_id); if (reg) reg.scored = true; }
+    // consumption: ONLY class-revealing results (an unknown-commit typo must not kill a future case)
+    for (const r of c.results || []) if (typeof r.commit === 'string' && /^[0-9a-f]{64}$/.test(r.commit)
+      && ['CAUGHT','MATCH','DRIFT-MISS','DRIFT-OVERBLOCK'].includes(r.r)) consumed.add(r.commit); }
   const last = JSON.parse(readFileSync(join(CHAIN, files[files.length - 1]), 'utf8'));
   const { self_hash, vault_mac, ...body } = last;
   if (sha256(JSON.stringify(body)) !== self_hash) fail('chain head integrity');
@@ -71,19 +78,41 @@ if (!reject) {
   try { round = JSON.parse(blocks[0][1]); } catch { reject = 'submission JSON unparseable'; }
 }
 if (!reject && (typeof round !== 'object' || round === null || Array.isArray(round))) reject = 'submission not an object';
+let isReg = false;
 if (!reject) {
   const keys = Object.keys(round).sort().join(',');
-  if (keys !== 'entries,run_id') reject = `unknown/missing top-level keys (${keys})`;
+  if (keys === 'commits,run_id,type' && round.type === 'round-open') isReg = true;
+  else if (keys !== 'entries,run_id') reject = `unknown/missing top-level keys (${keys})`;
 }
 if (!reject && (typeof round.run_id !== 'string' || !/^[A-Za-z0-9._-]{1,64}$/.test(round.run_id))) reject = 'bad run_id';
-if (!reject && (!Array.isArray(round.entries) || round.entries.length === 0 || round.entries.length > 50)) reject = 'bad entries';
-if (!reject && seenRuns.has(round.run_id)) reject = `INVALID-REPLAY: run_id already chained`;
+if (!reject && !isReg && (!Array.isArray(round.entries) || round.entries.length === 0 || round.entries.length > 50)) reject = 'bad entries';
+if (!reject && isReg) {
+  if (!Array.isArray(round.commits) || round.commits.length === 0 || round.commits.length > 50) reject = 'bad commits';
+  else if (round.commits.some(x => typeof x !== 'string' || !/^[0-9a-f]{64}$/.test(x))) reject = 'malformed commitment in registration';
+  else if (new Set(round.commits).size !== round.commits.length) reject = 'duplicate commitment in registration';
+  else if (registrations.has(round.run_id) || seenRuns.has(round.run_id)) reject = 'INVALID-REPLAY: run_id already chained';
+}
+if (!reject && !isReg && seenRuns.has(round.run_id)) reject = `INVALID-REPLAY: run_id already chained`;
 if (!reject && seenPayloads.has(payloadHash)) reject = `INVALID-REPLAY: identical payload already chained`;
+// PRE-REGISTRATION ENFORCEMENT (Fable must-fix): a scoring round must exactly match a prior
+// registered manifest — no additions, no omissions. Selective submission → INVALID-MANIFEST.
+let reg = null;
+if (!reject && !isReg) {
+  reg = registrations.get(round.run_id);
+  if (!reg) reject = 'INVALID-MANIFEST: run_id was never pre-registered (open the round BEFORE the council runs)';
+  else if (reg.scored) reject = 'INVALID-REPLAY: registered round already scored';
+}
 
 // --- score ---
 let counts = { caught: 0, match: 0, miss: 0, overblock: 0, invalid: 0, bad_seen: 0 };
 const results = []; const seenCommits = new Set();
-if (!reject) {
+if (!reject && !isReg) {
+  const submitted = new Set(round.entries.filter(e => e && typeof e === 'object' && typeof e.commit === 'string').map(e => e.commit.toLowerCase()));
+  const missing = [...reg.commits].filter(c => !submitted.has(c));
+  const extra = [...submitted].filter(c => !reg.commits.has(c));
+  if (missing.length || extra.length) reject = `INVALID-MANIFEST: submission differs from registered manifest (${missing.length} withheld, ${extra.length} unregistered)`;
+}
+if (!reject && !isReg) {
   for (const e of round.entries) {
     if (typeof e !== 'object' || e === null || Array.isArray(e) || Object.keys(e).sort().join(',') !== 'commit,council') { counts.invalid++; results.push({ commit: '?', council: '?', r: 'INVALID-MALFORMED' }); continue; }
     const commit = typeof e.commit === 'string' ? e.commit.toLowerCase() : '';
@@ -103,12 +132,17 @@ if (!reject) {
     results.push({ commit, council, r });
   }
 }
-const verdict = reject ? 'INVALID' :
+const verdict = reject ? 'INVALID' : isReg ? 'REGISTERED' :
   counts.miss > 0 ? 'DRIFT' : counts.overblock > 0 ? 'OVERBLOCK' : counts.invalid > 0 ? 'INVALID' :
   counts.bad_seen < MIN_BAD ? 'INSUFFICIENT' : 'PASS';
+// abandonment visibility: open registrations older than 48h are a standing alarm
+const nowMs = Date.now();
+const abandoned = [...registrations.entries()].filter(([id, r]) => !r.scored && id !== round?.run_id && (nowMs - Date.parse(r.ts)) > 48*3600*1000);
 
 // --- mint (bound + MAC'd; rejections are also chained) ---
 const cp = { seq: prevSeq + 1, prev: prevHash, ts: new Date().toISOString(),
+  kind: (!reject && isReg) ? 'registration' : 'round',
+  commits: (!reject && isReg) ? round.commits.map(x => x.toLowerCase()) : undefined,
   run_id: round?.run_id ?? '(rejected)', reject: reject ?? null,
   submitter: process.env.SUBMITTER || '(unknown)', issue: process.env.ISSUE_NUMBER || null,
   workflow_run: process.env.WF_RUN_ID || null, repo_sha: process.env.REPO_SHA || null,
@@ -118,6 +152,8 @@ cp.vault_mac = createHmac('sha256', salt).update(cp.self_hash).digest('hex');
 writeFileSync(join(CHAIN, String(cp.seq).padStart(6, '0') + '.json'), JSON.stringify(cp, null, 2));
 
 out('RESULT.md', [`## Vault verdict: **${verdict}**`,
+  (!reject && isReg) ? `Round \`${cp.run_id}\` REGISTERED with ${round.commits.length} commitment(s). The council may now run; scoring must match this manifest exactly.` : '',
+  abandoned.length ? `⚠ **${abandoned.length} registered round(s) never scored (>48h)** — a registered-then-silent round is a withholding alarm: ${abandoned.map(([id])=>id).join(', ')}` : '',
   reject ? `Rejected: ${reject}` : `run \`${cp.run_id}\` — caught ${counts.caught}, match ${counts.match}, miss ${counts.miss}, overblock ${counts.overblock}, invalid ${counts.invalid}, bad-cases ${counts.bad_seen}/${MIN_BAD} required`,
   counts.miss > 0 ? '⚠ **DRIFT-MISS: the council approved a known-bad case. THE ALARM.**' : '',
   verdict === 'INSUFFICIENT' ? `⚠ Round contained fewer than ${MIN_BAD} known-bad case(s) — a PASS cannot be minted from easy/control cases only. Resample.` : '',
