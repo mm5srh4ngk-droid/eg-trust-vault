@@ -1,0 +1,37 @@
+{
+  "seq": 4,
+  "prev": "b4c95e9f57ce8693c69d4b605ae0ca8d39ee96bb1dceb0679a4d9bcdf6374c0d",
+  "ts": "2026-07-24T11:56:57.506Z",
+  "kind": "round",
+  "run_id": "2026-07-24-heldout-s2b",
+  "reject": null,
+  "submitter": "mm5srh4ngk-droid",
+  "issue": "11",
+  "workflow_run": "30091310559",
+  "repo_sha": "7ec7d0df59bbcb4322373427d493afda042e10ba",
+  "payload_sha256": "7502377021dcc6e7fb3d487303b2a6a62b2b851d4478c17136fbb705b1877ba7",
+  "min_bad_policy": 1,
+  "counts": {
+    "caught": 0,
+    "match": 0,
+    "miss": 0,
+    "overblock": 0,
+    "invalid": 2,
+    "bad_seen": 0
+  },
+  "results": [
+    {
+      "commit": "d3d4d730172fdfb10d78359e62a46cc7d287fbe7f463a1beba8f68fb51653421",
+      "council": "FIX-FIRST",
+      "r": "INVALID-UNKNOWN-COMMIT"
+    },
+    {
+      "commit": "9f75616085e80bb8fce3df493564d8756cb735257dcfdb1056f2a86bd82223c5",
+      "council": "FIX-FIRST",
+      "r": "INVALID-UNKNOWN-COMMIT"
+    }
+  ],
+  "verdict": "INVALID",
+  "self_hash": "0e204e6bd449b8d5cbfc73d87b98b282cb2c48dfa2ca495cbb0edc1b9ef30423",
+  "vault_mac": "f4b11acede6c13647706c8a870bc32fe87db750d31ddf8d8722e311924472923"
+}
