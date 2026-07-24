@@ -1,0 +1,26 @@
+{
+  "seq": 3,
+  "prev": "2d03243547fd539a3465b560b3ca9831259bc7e40311fe59be27c6bef0bfbd0f",
+  "ts": "2026-07-24T11:19:28.138Z",
+  "run_id": "v2-live",
+  "reject": null,
+  "counts": {
+    "caught": 1,
+    "match": 1,
+    "miss": 0,
+    "overblock": 0,
+    "invalid": 0
+  },
+  "results": [
+    {
+      "commit": "12998cd64ce8",
+      "r": "CAUGHT"
+    },
+    {
+      "commit": "21af51a07a40",
+      "r": "MATCH"
+    }
+  ],
+  "verdict": "PASS",
+  "self_hash": "471fea5be12019733efba507dd1eba1e085051c2fb9a9a71a7094a4bf825b231"
+}
